@@ -162,6 +162,45 @@ assert helper.LastResponse["Data"]["MyOutput"] == "computed-value"
 that would have been PUT to `event['ResponseURL']`. With `test_mode=True`,
 the HTTPS call itself is skipped entirely.
 
+### Tips
+
+#### Setting `Reason`
+
+The `Reason` field appears in CloudFormation's Stack Events. By default it's
+empty on success and the exception message on failure. You can set it
+explicitly from your handler to give operators more context:
+
+```python
+@helper.create
+def create(event, context):
+    helper.Reason = "Provisioned 3 widgets, 0 failures"
+    helper.Data["Count"] = 3
+    return "MyResourceId"
+```
+
+#### Hiding sensitive data with `NoEcho`
+
+If your custom resource produces sensitive values (passwords, tokens, keys),
+set `helper.NoEcho = True` so CloudFormation hides the `Data` from console
+output and stack events:
+
+```python
+@helper.create
+def create(event, context):
+    helper.NoEcho = True
+    helper.Data["Token"] = generate_secret_token()
+    return "MyResourceId"
+```
+
+#### `helper.Data` and Updates
+
+`helper.Data` is **per-invocation**. Each time CloudFormation calls your
+Lambda (Create, Update, or Delete), the helper resets `helper.Data` to an
+empty dict before your handler runs. Even if your underlying resource
+hasn't changed during an Update, you still need to populate `helper.Data`
+with the values you want returned to CloudFormation. There is no automatic
+carry-over from the previous invocation.
+
 ### Use CDK to deploy a Custom Resource that uses Custom Resource Helper
 
 You can use the [AWS Cloud Development Kit (AWS CDK)](https://docs.aws.amazon.com/cdk/v2/guide/home.html) to deploy a Custom Resource that uses Custom Resource Helper. AWS CDK is an open-source software development framework for defining cloud infrastructure in code and provisioning it through AWS CloudFormation.
