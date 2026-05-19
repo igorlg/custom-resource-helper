@@ -38,3 +38,10 @@ exclude = ["tests*"]
 
 [tool.setuptools.package-data]
 crhelper = ["py.typed", "*.pyi"]
+
+[tool.coverage.run]
+branch = true
+source = ["crhelper"]
+
+[tool.coverage.report]
+show_missing = true
