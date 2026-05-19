@@ -3,7 +3,6 @@ import logging
 
 from crhelper.log_helper import JsonFormatter, setupLogger
 
-
 # --- setupLogger ----------------------------------------------------------
 
 def test_no_formatting_when_formatter_cls_is_none():
@@ -69,7 +68,7 @@ def test_json_formatter_includes_exception(caplog):
     setupLogger(level='DEBUG', formatter_cls=JsonFormatter, RequestType='ContainerInit')
     with caplog.at_level(logging.DEBUG):
         try:
-            1 + 't'
+            raise TypeError("intentional, to verify exc_info logging")
         except Exception:
             logger.info("[]", exc_info=True)
     handler = logging.root.handlers[0]

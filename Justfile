@@ -12,6 +12,15 @@ test:
 test-cov:
     uv run pytest --cov=crhelper --cov-report=term-missing
 
+# Lint + type-check (ruff + mypy). Same checks as the CI lint job.
+lint:
+    uv run ruff check
+    uv run mypy crhelper/
+
+# Auto-fix the ruff issues that have safe fixes.
+lint-fix:
+    uv run ruff check --fix
+
 # Refresh uv.lock after pyproject.toml changes.
 lock:
     uv lock

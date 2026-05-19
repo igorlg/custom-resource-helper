@@ -1,4 +1,3 @@
-from __future__ import print_function
 import json
 import logging
 
@@ -17,7 +16,7 @@ class JsonFormatter(logging.Formatter):
     """
 
     def __init__(self, **kwargs):
-        super(JsonFormatter, self).__init__()
+        super().__init__()
         self.format_dict = {
             'timestamp': '%(asctime)s',
             'level': '%(levelname)s',
