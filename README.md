@@ -4,12 +4,14 @@ Simplify best practice Custom Resource creation, sending responses to CloudForma
 trapping, and detailed configurable logging.
 
 [![CI](https://github.com/igorlg/custom-resource-helper/actions/workflows/ci.yml/badge.svg)](https://github.com/igorlg/custom-resource-helper/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/cfn-resource-helper.svg)](https://pypi.org/project/cfn-resource-helper/)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://github.com/igorlg/custom-resource-helper)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
 > **Note**: this is a fork of [aws-cloudformation/custom-resource-helper](https://github.com/aws-cloudformation/custom-resource-helper),
 > brought up to date with modern Python tooling, multi-arch CI, and a number of bug fixes from the upstream
-> issue tracker.
+> issue tracker. Distributed on PyPI as **`cfn-resource-helper`** (the upstream name `crhelper` belongs
+> to the original AWS-maintained project). The Python import name is unchanged: `from crhelper import CfnResource`.
 
 ## Features
 
@@ -29,8 +31,22 @@ Install into the root folder of your lambda function
 
 ```shell
 cd my-lambda-function/
-pip install crhelper -t .
+pip install cfn-resource-helper -t .
 ```
+
+The PyPI **distribution name** is `cfn-resource-helper`, the Python **import name** is `crhelper`:
+
+```python
+from crhelper import CfnResource
+```
+
+### Migrating from upstream `crhelper`
+
+If you previously used [`aws-cloudformation/custom-resource-helper`](https://github.com/aws-cloudformation/custom-resource-helper) (PyPI: `crhelper`):
+
+1. Replace `crhelper` with `cfn-resource-helper` in your install command (or `requirements.txt` / `pyproject.toml`).
+2. Imports stay exactly the same: `from crhelper import CfnResource`.
+3. No code changes required. The Python API is identical apart from the new `test_mode` parameter (additive, default off).
 
 ## Example Usage
 
