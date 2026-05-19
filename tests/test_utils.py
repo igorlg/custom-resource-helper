@@ -1,7 +1,7 @@
 import json
 import ssl
 import tempfile
-from unittest.mock import patch, Mock, ANY, MagicMock
+from unittest.mock import ANY, MagicMock, Mock, patch
 
 from crhelper import utils
 
@@ -121,9 +121,6 @@ def test_send_response_does_not_retry_indefinitely(mock_https_connection, mock_s
         pass  # captured at safety cap; assertion below surfaces the bug
 
     assert mock_connection.getresponse.call_count <= utils.MAX_RETRIES, (
-        "_send_response made {actual} attempts, but MAX_RETRIES is {limit}. "
+        f"_send_response made {mock_connection.getresponse.call_count} attempts, but MAX_RETRIES is {utils.MAX_RETRIES}. "
         "This indicates unbounded retries (outer `while True` resetting the counter)."
-    ).format(
-        actual=mock_connection.getresponse.call_count,
-        limit=utils.MAX_RETRIES,
     )

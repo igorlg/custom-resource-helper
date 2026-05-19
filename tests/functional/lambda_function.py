@@ -1,7 +1,6 @@
-from __future__ import print_function
-from crhelper import CfnResource
 import logging
-import boto3
+
+from crhelper import CfnResource
 
 logger = logging.getLogger(__name__)
 # Initialise the helper, all inputs are optional, this example shows the defaults

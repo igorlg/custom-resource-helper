@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 TODO:
 * Async mode – take a wait condition handle as an input, increases max timeout to 12 hours
@@ -7,17 +6,18 @@ TODO:
 * Functional tests
 """
 
-from __future__ import print_function
-import threading
-from crhelper.utils import _send_response
-from crhelper import log_helper
-import logging
-import random
-import boto3
-import string
 import json
+import logging
 import os
+import random
+import string
+import threading
 from time import sleep
+
+import boto3
+
+from crhelper import log_helper
+from crhelper.utils import _send_response
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ SUCCESS = 'SUCCESS'
 FAILED = 'FAILED'
 
 
-class CfnResource(object):
+class CfnResource:
 
     def __init__(self, json_logging=False, log_level='DEBUG', boto_level='ERROR', polling_interval=2, sleep_on_delete=120, ssl_verify=None, test_mode=False):
         self._sleep_on_delete = sleep_on_delete
@@ -86,7 +86,7 @@ class CfnResource(object):
             else:
                 logger.debug("enabling send_response")
                 self._send_response = True
-            logger.debug("_send_response: %s" % self._send_response)
+            logger.debug("_send_response: %s", self._send_response)
             if self._send_response:
                 if self.RequestType == 'Delete':
                     self._wait_for_cwlogs()
@@ -153,15 +153,15 @@ class CfnResource(object):
 
     def _polling_init(self, event):
         # Setup polling on initial request
-        logger.debug("pid1: %s" % self.PhysicalResourceId)
+        logger.debug("pid1: %s", self.PhysicalResourceId)
         if 'CrHelperPoll' not in event.keys() and self.Status != FAILED:
             logger.info("Setting up polling")
             self.Data["PhysicalResourceId"] = self.PhysicalResourceId
             self._setup_polling()
             self.PhysicalResourceId = None
-            logger.debug("pid2: %s" % self.PhysicalResourceId)
+            logger.debug("pid2: %s", self.PhysicalResourceId)
         # if physical id is set, or there was a failure then we're done
-        logger.debug("pid3: %s" % self.PhysicalResourceId)
+        logger.debug("pid3: %s", self.PhysicalResourceId)
         if self.PhysicalResourceId or self.Status == FAILED:
             logger.info("Polling complete, removing cwe schedule")
             self._remove_polling()
@@ -287,8 +287,8 @@ class CfnResource(object):
                 del self.Data[k]
 
     @staticmethod
-    def _rand_string(l):
-        return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(l))
+    def _rand_string(length):
+        return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(length))
 
     def _add_permission(self, rule_arn):
         sid = self._event['LogicalResourceId'] + self._rand_string(8)
@@ -305,7 +305,7 @@ class CfnResource(object):
         schedule_unit = 'minutes' if self._polling_interval != 1 else 'minute'
         response = self._events_client.put_rule(
             Name=self._event['LogicalResourceId'] + self._rand_string(8),
-            ScheduleExpression='rate({} {})'.format(self._polling_interval, schedule_unit),
+            ScheduleExpression=f'rate({self._polling_interval} {schedule_unit})',
             State='ENABLED',
         )
         return response["RuleArn"]
@@ -321,7 +321,7 @@ class CfnResource(object):
             Targets=[
                 {
                     'Id': '1',
-                    'Arn': 'arn:%s:lambda:%s:%s:function:%s' % (partition, region, account_id, func_name),
+                    'Arn': f'arn:{partition}:lambda:{region}:{account_id}:function:{func_name}',
                     'Input': json.dumps(self._event)
                 }
             ]

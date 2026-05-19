@@ -1,11 +1,10 @@
 import copy
 import threading
-from unittest.mock import call, patch, Mock
+from unittest.mock import Mock, call, patch
 
 import pytest
 
 import crhelper
-
 
 # Canonical test events for the three CFN custom-resource lifecycle phases.
 # Tests should consume these via the `events` fixture rather than directly,
@@ -100,7 +99,7 @@ def test_init_failure_generates_physical_id_for_create(events, mock_context):
     assert c.PhysicalResourceId != '', \
         "init_failure on Create produced empty PhysicalResourceId"
     assert c.PhysicalResourceId.startswith('test-stack-id_TestResourceId_'), \
-        "expected generated id, got: {}".format(repr(c.PhysicalResourceId))
+        f"expected generated id, got: {repr(c.PhysicalResourceId)}"
 
 
 @patch('crhelper.log_helper.setupLogger', Mock())
@@ -621,6 +620,6 @@ def test_wrappers():
         pass
 
     for f in ["create", "update", "delete", "poll_create", "poll_update", "poll_delete"]:
-        assert getattr(c, "_%s_func" % f) is None
+        assert getattr(c, f"_{f}_func") is None
         getattr(c, f)(func)
-        assert getattr(c, "_%s_func" % f) is func
+        assert getattr(c, f"_{f}_func") is func
