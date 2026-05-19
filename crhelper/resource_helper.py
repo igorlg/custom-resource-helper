@@ -27,7 +27,7 @@ FAILED = 'FAILED'
 
 class CfnResource(object):
 
-    def __init__(self, json_logging=False, log_level='DEBUG', boto_level='ERROR', polling_interval=2, sleep_on_delete=120, ssl_verify=None):
+    def __init__(self, json_logging=False, log_level='DEBUG', boto_level='ERROR', polling_interval=2, sleep_on_delete=120, ssl_verify=None, test_mode=False):
         self._sleep_on_delete = sleep_on_delete
         self._create_func = None
         self._update_func = None
@@ -42,6 +42,8 @@ class CfnResource(object):
         self._boto_level = boto_level
         self._send_response = False
         self._polling_interval = polling_interval
+        self._test_mode = test_mode
+        self.LastResponse = None
         self.Status = ""
         self.Reason = ""
         self.PhysicalResourceId = ""
@@ -267,6 +269,12 @@ class CfnResource(object):
         }
         if status:
             response_body.update({'Status': status, 'Reason': reason})
+        if self._test_mode:
+            # Capture the response for inspection instead of POSTing to CFN.
+            # See README "Testing crhelper Lambdas" section. Issues #52, #54.
+            self.LastResponse = response_body
+            logger.info("test_mode: skipping CloudFormation response, captured on LastResponse")
+            return
         send_response(self._response_url, response_body, self._ssl_verify)
 
     def init_failure(self, error):

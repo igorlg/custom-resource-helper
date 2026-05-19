@@ -349,6 +349,98 @@ def test_send():
     send_response_mock.assert_called_once()
 
 
+# --- test_mode ------------------------------------------------------------
+
+# Lets users invoke the helper locally (SAM-local, unit tests) without
+# actually POSTing to CloudFormation. The would-be response body is captured
+# on `helper.LastResponse` for assertion. Issues #52, #54.
+
+@patch('crhelper.log_helper.setupLogger', Mock())
+@patch('crhelper.resource_helper.CfnResource._set_timeout', Mock())
+def test_test_mode_default_is_false():
+    """test_mode is opt-in; default behavior unchanged."""
+    c = crhelper.resource_helper.CfnResource()
+    assert c._test_mode is False
+    assert c.LastResponse is None
+
+
+@patch('crhelper.log_helper.setupLogger', Mock())
+@patch('crhelper.resource_helper.CfnResource._set_timeout', Mock())
+def test_test_mode_can_be_enabled():
+    """Constructor accepts test_mode=True."""
+    c = crhelper.resource_helper.CfnResource(test_mode=True)
+    assert c._test_mode is True
+
+
+@patch('crhelper.log_helper.setupLogger', Mock())
+@patch('crhelper.resource_helper.CfnResource._poll_enabled', Mock(return_value=False))
+@patch('crhelper.resource_helper.CfnResource._wait_for_cwlogs', Mock())
+@patch('crhelper.resource_helper.CfnResource._set_timeout', Mock())
+def test_send_skips_https_in_test_mode():
+    """With test_mode=True, _send must not invoke the HTTPS function."""
+    c = crhelper.resource_helper.CfnResource(test_mode=True)
+    send_response_mock = Mock()
+    c._send(send_response=send_response_mock)
+    send_response_mock.assert_not_called()
+
+
+@patch('crhelper.log_helper.setupLogger', Mock())
+@patch('crhelper.resource_helper.CfnResource._poll_enabled', Mock(return_value=False))
+@patch('crhelper.resource_helper.CfnResource._wait_for_cwlogs', Mock())
+@patch('crhelper.resource_helper.CfnResource._set_timeout', Mock())
+def test_send_populates_last_response_in_test_mode():
+    """With test_mode=True, _send stores the response body on LastResponse."""
+    c = crhelper.resource_helper.CfnResource(test_mode=True)
+    c.Status = "SUCCESS"
+    c.PhysicalResourceId = "test-pid"
+    c.StackId = "stack-id"
+    c.RequestId = "req-id"
+    c.LogicalResourceId = "logical-id"
+    c.Data = {"key": "value"}
+
+    c._send()
+
+    assert c.LastResponse is not None
+    assert c.LastResponse["Status"] == "SUCCESS"
+    assert c.LastResponse["PhysicalResourceId"] == "test-pid"
+    assert c.LastResponse["StackId"] == "stack-id"
+    assert c.LastResponse["RequestId"] == "req-id"
+    assert c.LastResponse["LogicalResourceId"] == "logical-id"
+    assert c.LastResponse["Data"] == {"key": "value"}
+
+
+@patch('crhelper.log_helper.setupLogger', Mock())
+@patch('crhelper.resource_helper.CfnResource._poll_enabled', Mock(return_value=False))
+@patch('crhelper.resource_helper.CfnResource._wait_for_cwlogs', Mock())
+@patch('crhelper.resource_helper.CfnResource._set_timeout', Mock())
+def test_test_mode_captures_status_override():
+    """_send(status, reason) overrides apply correctly to LastResponse."""
+    c = crhelper.resource_helper.CfnResource(test_mode=True)
+    c.Status = "SUCCESS"
+    c.StackId = "stack-id"
+    c.RequestId = "req-id"
+    c.LogicalResourceId = "logical-id"
+
+    c._send(status="FAILED", reason="something blew up")
+
+    assert c.LastResponse["Status"] == "FAILED"
+    assert c.LastResponse["Reason"] == "something blew up"
+
+
+@patch('crhelper.log_helper.setupLogger', Mock())
+@patch('crhelper.resource_helper.CfnResource._poll_enabled', Mock(return_value=False))
+@patch('crhelper.resource_helper.CfnResource._wait_for_cwlogs', Mock())
+@patch('crhelper.resource_helper.CfnResource._set_timeout', Mock())
+def test_test_mode_does_not_affect_default_send_path():
+    """test_mode=False (default) keeps LastResponse None and calls _send_response."""
+    c = crhelper.resource_helper.CfnResource()
+    send_response_mock = Mock()
+    c._send(send_response=send_response_mock)
+
+    send_response_mock.assert_called_once()
+    assert c.LastResponse is None
+
+
 # --- timeout watchdog -----------------------------------------------------
 
 @patch('crhelper.log_helper.setupLogger', Mock())

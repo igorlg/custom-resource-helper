@@ -127,6 +127,38 @@ To turn off certification verification, or to use a custom CA bundle path for th
 * `False` - do not validate SSL certificates. SSL will still be used, but SSL certificates will not be verified.
 * `path/to/cert/bundle.pem` - A filename of the CA cert bundle to uses. You can specify this argument if you want to use a different CA cert bundle than the one used by botocore.
 
+### Testing crhelper Lambdas
+
+For local invocations (SAM-local, unit tests, ad-hoc Python scripts) you usually
+do **not** want crhelper to actually POST to a CloudFormation pre-signed URL.
+Pass `test_mode=True` to skip the response and capture it on the helper instead:
+
+```python
+from crhelper import CfnResource
+
+helper = CfnResource(test_mode=True)
+
+@helper.create
+def create(event, context):
+    helper.Data["MyOutput"] = "computed-value"
+    return "MyResourceId"
+
+def handler(event, context):
+    helper(event, context)
+
+# Drive the handler with a fake event/context, then assert on the response
+# that *would* have been sent to CloudFormation:
+handler(fake_event, fake_context)
+
+assert helper.LastResponse["Status"] == "SUCCESS"
+assert helper.LastResponse["PhysicalResourceId"] == "MyResourceId"
+assert helper.LastResponse["Data"]["MyOutput"] == "computed-value"
+```
+
+`LastResponse` is `None` until `_send` runs; afterwards it contains the dict
+that would have been PUT to `event['ResponseURL']`. With `test_mode=True`,
+the HTTPS call itself is skipped entirely.
+
 ### Use CDK to depoy a Custom Resource that uses Custom Resource Helper
 
 You can use the [AWS Cloud Development Kit (AWS CDK)](https://docs.aws.amazon.com/cdk/v2/guide/home.html) to deploy a Custom Resource that uses Custom Resource Helper. AWS CDK is an open-source software development framework for defining cloud infrastructure in code and provisioning it through AWS CloudFormation.
