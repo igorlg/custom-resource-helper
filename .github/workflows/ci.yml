@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  # Cache and venv are on different filesystems under `act`; copying is fine
+  # and silences a noisy hardlink warning. Real GH-hosted runners are faster
+  # either way for our tiny dep set.
+  UV_LINK_MODE: copy
+
+jobs:
+  test:
+    name: test (py${{ matrix.python }} / ${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        python: ['3.11', '3.12', '3.13', '3.14']
+    steps:
+      - uses: actions/checkout@v5
+
+      # Workaround: under `act`, the post step of JS actions is invoked via
+      # `docker exec node ...` with a stripped PATH that doesn't include the
+      # acttoolcache directory where Node lives. Real GH-hosted runners are
+      # unaffected (they have Node at /usr/bin already).
+      - name: act compat - expose node on standard PATH
+        if: env.ACT == 'true'
+        run: |
+          set -eu
+          NODE_BIN=$(find /opt/acttoolcache/node -name node -type f -executable 2>/dev/null | head -1)
+          if [ -n "$NODE_BIN" ] && [ ! -e /usr/local/bin/node ]; then
+            ln -sf "$NODE_BIN" /usr/local/bin/node
+          fi
+          node --version
+
+      - name: Install uv with Python ${{ matrix.python }}
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --extra test
+
+      - name: Run tests
+        run: uv run pytest --cov=crhelper --cov-report=xml --cov-report=term -q
