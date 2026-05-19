@@ -49,3 +49,35 @@ jobs:
           gh release upload "${{ needs.release-please.outputs.tag_name }}" dist/* \
             --repo "${{ github.repository }}" \
             --clobber
+
+  publish-pypi:
+    name: publish to PyPI
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-24.04
+    # Authenticate to PyPI via OIDC (trusted publishing).
+    # PyPI must have a trusted publisher configured for this project; the
+    # config refers to: repo igorlg/custom-resource-helper, workflow
+    # release.yml, environment 'pypi'. See PyPI project settings.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/cfn-resource-helper
+    permissions:
+      id-token: write   # required for OIDC
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Install uv with Python 3.13
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: '3.13'
+          enable-cache: true
+
+      - name: Build wheel + sdist
+        run: uv build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
