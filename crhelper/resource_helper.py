@@ -97,7 +97,10 @@ class CfnResource(object):
                 self._timer.cancel()
 
     def _wait_for_cwlogs(self, sleep=sleep):
-        time_left = int(self._context.get_remaining_time_in_millis() / 1000) - 15
+        seconds = self._remaining_time_seconds()
+        if seconds is None:
+            return
+        time_left = int(seconds) - 15
         sleep_time = 0
 
         if time_left > self._sleep_on_delete:
@@ -219,9 +222,26 @@ class CfnResource(object):
         logger.error("Execution is about to time out, sending failure message")
         self._send(FAILED, "Execution timed out")
 
+    def _remaining_time_seconds(self):
+        """Return remaining execution time in seconds, or None if context
+        doesn't expose `get_remaining_time_in_millis()` (e.g. SAM-local,
+        tests, or third-party invocations passing a dict as context).
+        Issue #76.
+        """
+        try:
+            return self._context.get_remaining_time_in_millis() / 1000.0
+        except AttributeError:
+            return None
+
     def _set_timeout(self):
-        self._timer = threading.Timer((self._context.get_remaining_time_in_millis() / 1000.00) - 0.5,
-                                      self._timeout)
+        seconds = self._remaining_time_seconds()
+        if seconds is None:
+            logger.warning(
+                "Context has no get_remaining_time_in_millis(); "
+                "timeout watchdog disabled"
+            )
+            return
+        self._timer = threading.Timer(seconds - 0.5, self._timeout)
         self._timer.start()
 
     def _get_func(self):
