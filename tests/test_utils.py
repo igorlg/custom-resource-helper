@@ -87,3 +87,43 @@ def test_send_response_retry(mock_https_connection, mock_logger):
     assert mock_logger.info.call_count == 1
     assert mock_https_connection.call_count == 3
     assert mock_connection.getresponse.call_count == 3
+
+
+@patch('crhelper.utils.time.sleep')
+@patch('crhelper.utils.HTTPSConnection')
+def test_send_response_does_not_retry_indefinitely(mock_https_connection, mock_sleep):
+    """Persistent failures must not cause unbounded retries (regression).
+
+    The original implementation wrapped the bounded-retry loop in an
+    outer `while True` that reset retry_count each iteration, so
+    MAX_RETRIES was only the inner-batch bound. Total retries were
+    unbounded: on persistent network failures _send_response would
+    consume the entire Lambda timeout rather than giving up.
+    """
+    mock_connection = mock_https_connection.return_value
+
+    # Always fail. SystemExit (a BaseException, not Exception) is a
+    # safety net so this test cannot hang the suite if the bug is
+    # still present -- _send_response's `except Exception` won't
+    # catch it.
+    safety_cap = utils.MAX_RETRIES * 4
+
+    def fail_or_bail(*args, **kwargs):
+        if mock_connection.getresponse.call_count > safety_cap:
+            raise SystemExit("retried too many times")
+        raise Exception("simulated network failure")
+
+    mock_connection.getresponse.side_effect = fail_or_bail
+
+    try:
+        utils._send_response("https://example.com/path", {})
+    except SystemExit:
+        pass  # captured at safety cap; assertion below surfaces the bug
+
+    assert mock_connection.getresponse.call_count <= utils.MAX_RETRIES, (
+        "_send_response made {actual} attempts, but MAX_RETRIES is {limit}. "
+        "This indicates unbounded retries (outer `while True` resetting the counter)."
+    ).format(
+        actual=mock_connection.getresponse.call_count,
+        limit=utils.MAX_RETRIES,
+    )

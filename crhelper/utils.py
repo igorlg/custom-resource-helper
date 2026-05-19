@@ -37,22 +37,18 @@ def _send_response(response_url: AnyStr, response_body: AnyStr, ssl_verify: Unio
         ctx.verify_mode = ssl.CERT_NONE
     # If ssl_verify is True or None dont modify the context in any way.
 
-    while True:
-        retry_count = 0
-        success = False
-        while retry_count < MAX_RETRIES and not success:
-            try:
-                connection = HTTPSConnection(host, context=ctx)
-                connection.request(method="PUT", url=url, body=json_response_body, headers=headers)
-                response = connection.getresponse()
-                logger.info("CloudFormation returned status code: {}".format(response.reason))
-                success = True
-            except Exception as e:
-                retry_count += 1
-                logger.error("Unexpected failure sending response to CloudFormation {}. Retrying in 2 seconds...".format(e), exc_info=True)
-                time.sleep(2)
-        if success:
-            break
-        else:
-            logger.error("Maximum retries reached. Unable to send response to CloudFormation.")
-            time.sleep(5)
+    retry_count = 0
+    success = False
+    while retry_count < MAX_RETRIES and not success:
+        try:
+            connection = HTTPSConnection(host, context=ctx)
+            connection.request(method="PUT", url=url, body=json_response_body, headers=headers)
+            response = connection.getresponse()
+            logger.info("CloudFormation returned status code: {}".format(response.reason))
+            success = True
+        except Exception as e:
+            retry_count += 1
+            logger.error("Unexpected failure sending response to CloudFormation {}. Retrying in 2 seconds...".format(e), exc_info=True)
+            time.sleep(2)
+    if not success:
+        logger.error("Maximum retries reached. Unable to send response to CloudFormation.")
