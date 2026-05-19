@@ -3,10 +3,13 @@
 Simplify best practice Custom Resource creation, sending responses to CloudFormation and providing exception, timeout 
 trapping, and detailed configurable logging.
 
-[![PyPI Version](https://img.shields.io/pypi/v/crhelper.svg)](https://pypi.org/project/crhelper/)
-![Python Versions](https://img.shields.io/pypi/pyversions/crhelper.svg)
-[![Build Status](https://travis-ci.com/aws-cloudformation/custom-resource-helper.svg?branch=main)](https://travis-ci.com/aws-cloudformation/custom-resource-helper)
-[![Test Coverage](https://codecov.io/gh/aws-cloudformation/custom-resource-helper/branch/main/graph/badge.svg)](https://codecov.io/gh/aws-cloudformation/custom-resource-helper)
+[![CI](https://github.com/igorlg/custom-resource-helper/actions/workflows/ci.yml/badge.svg)](https://github.com/igorlg/custom-resource-helper/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://github.com/igorlg/custom-resource-helper)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
+
+> **Note**: this is a fork of [aws-cloudformation/custom-resource-helper](https://github.com/aws-cloudformation/custom-resource-helper),
+> brought up to date with modern Python tooling, multi-arch CI, and a number of bug fixes from the upstream
+> issue tracker.
 
 ## Features
 
@@ -18,7 +21,8 @@ trapping, and detailed configurable logging.
 particular CloudFormation event
 * Catches function timeouts and sends CloudFormation a failure response
 * Static typing (mypy) compatible
- 
+* Built-in `test_mode` for unit tests and SAM-local invocations
+
 ## Installation
 
 Install into the root folder of your lambda function
@@ -33,7 +37,6 @@ pip install crhelper -t .
 [This blog](https://aws.amazon.com/blogs/infrastructure-and-automation/aws-cloudformation-custom-resource-creation-with-python-aws-lambda-and-crhelper/) covers usage in more detail.
 
 ```python
-from __future__ import print_function
 from crhelper import CfnResource
 import logging
 
@@ -159,14 +162,23 @@ assert helper.LastResponse["Data"]["MyOutput"] == "computed-value"
 that would have been PUT to `event['ResponseURL']`. With `test_mode=True`,
 the HTTPS call itself is skipped entirely.
 
-### Use CDK to depoy a Custom Resource that uses Custom Resource Helper
+### Use CDK to deploy a Custom Resource that uses Custom Resource Helper
 
 You can use the [AWS Cloud Development Kit (AWS CDK)](https://docs.aws.amazon.com/cdk/v2/guide/home.html) to deploy a Custom Resource that uses Custom Resource Helper. AWS CDK is an open-source software development framework for defining cloud infrastructure in code and provisioning it through AWS CloudFormation.
 
-**Note**: `crhelper` is not intended to be used with AWS CDK using the [Provider](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.custom_resources.Provider.html) construct.
+> **Important**: `crhelper` is **not** compatible with AWS CDK's [`Provider`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.custom_resources.Provider.html) construct.
+>
+> The `Provider` framework deploys an internal "framework" Lambda that wraps your handler and **expects your handler to return a response object** (`{ PhysicalResourceId, Data, NoEcho, ... }`). The framework Lambda then takes care of POSTing to CloudFormation's `ResponseURL` for you.
+>
+> `crhelper`, in contrast, POSTs directly to `event['ResponseURL']` itself — which is what CloudFormation expects when it invokes a custom-resource Lambda *directly* (i.e. `serviceToken: <lambda_arn>`), but **not** when invoked through the `Provider` framework. Using `crhelper` inside a `Provider`-managed Lambda will cause the response to be sent twice in incompatible formats and the resource will hang.
+>
+> **If you're using `Provider`:** write a plain handler that returns the response dict; don't use `crhelper`. See AWS CDK's [Custom Resources guide](https://docs.aws.amazon.com/cdk/v2/guide/develop-resources.html).
+>
+> **If you're using `CustomResource` directly with a `serviceToken`:** `crhelper` is the right fit. See the example below.
 
 #### AWS CDK template example
-```
+
+```python
 from aws_cdk import (
     ...
     aws_lambda as _lambda,
@@ -176,17 +188,31 @@ from aws_cdk import (
 crhelperSumResource = _lambda.Function(...)
 
 customResource = CustomResource(
-  self, 
-  'MyCustomResource'
-  serviceToken = crhelperSumResource.function_arn,
-  properties = {
+  self,
+  'MyCustomResource',
+  serviceToken=crhelperSumResource.function_arn,
+  properties={
     'No1': 1,
-    'No2': 2
+    'No2': 2,
   },
 )
-
-
 ```
+
+## Development
+
+Development tasks are wired up in the project [`Justfile`](./Justfile). With [`uv`](https://docs.astral.sh/uv/) installed:
+
+```shell
+uv sync                # install all dev dependencies (test + lint)
+just test              # run the test suite on the host Python
+just test-cov          # with coverage report
+just lint              # ruff + mypy
+just lint-fix          # apply ruff's safe auto-fixes
+just test-matrix       # run the full CI matrix locally via `act` (requires Docker)
+just build             # build wheel + sdist into ./dist
+```
+
+The CI workflow at [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the single source of truth for the test matrix: 8 jobs across `{ubuntu-24.04, ubuntu-24.04-arm} × {python 3.11, 3.12, 3.13, 3.14}`, plus a separate lint job.
 
 ## Credits
 
