@@ -132,6 +132,14 @@ class CfnResource(object):
         if self._timer:
             self._timer.cancel()
         if self._init_failed:
+            # Resolve a PhysicalResourceId before sending FAILED so CloudFormation
+            # can roll back cleanly. Without one, the stack ends up in
+            # ROLLBACK_FAILED. Mirrors _cfn_response: prefer the event's value
+            # (Update/Delete), otherwise generate one (Create). Issue #7, #67.
+            if "PhysicalResourceId" in event:
+                self.PhysicalResourceId = event["PhysicalResourceId"]
+            else:
+                self.PhysicalResourceId = self.generate_physical_id(event)
             self._send(FAILED, str(self._init_failed))
             return False
         self._set_timeout()

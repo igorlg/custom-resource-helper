@@ -80,6 +80,61 @@ def test_init_failure(mock_method):
     assert c._init_failed
 
 
+# Regression tests for #7 and #67: init_failure() must produce a usable
+# PhysicalResourceId so CloudFormation can roll back. Without one, the
+# FAILED response leaves the stack in ROLLBACK_FAILED.
+
+@patch('crhelper.log_helper.setupLogger', Mock())
+@patch('crhelper.resource_helper.CfnResource._poll_enabled', Mock(return_value=False))
+@patch('crhelper.resource_helper.CfnResource._polling_init', Mock())
+@patch('crhelper.resource_helper.CfnResource._wait_for_cwlogs', Mock())
+@patch('crhelper.resource_helper.CfnResource._send', Mock())
+@patch('crhelper.resource_helper.CfnResource._set_timeout', Mock())
+@patch('crhelper.resource_helper.CfnResource._wrap_function', Mock())
+def test_init_failure_generates_physical_id_for_create(events, mock_context):
+    """Create + init_failure must auto-generate a PhysicalResourceId."""
+    c = crhelper.resource_helper.CfnResource()
+    c.init_failure(Exception('TestException'))
+    c.__call__(events["Create"], mock_context)
+
+    assert c.PhysicalResourceId != '', \
+        "init_failure on Create produced empty PhysicalResourceId"
+    assert c.PhysicalResourceId.startswith('test-stack-id_TestResourceId_'), \
+        "expected generated id, got: {}".format(repr(c.PhysicalResourceId))
+
+
+@patch('crhelper.log_helper.setupLogger', Mock())
+@patch('crhelper.resource_helper.CfnResource._poll_enabled', Mock(return_value=False))
+@patch('crhelper.resource_helper.CfnResource._polling_init', Mock())
+@patch('crhelper.resource_helper.CfnResource._wait_for_cwlogs', Mock())
+@patch('crhelper.resource_helper.CfnResource._send', Mock())
+@patch('crhelper.resource_helper.CfnResource._set_timeout', Mock())
+@patch('crhelper.resource_helper.CfnResource._wrap_function', Mock())
+def test_init_failure_preserves_event_physical_id_for_update(events, mock_context):
+    """Update + init_failure must preserve the event's PhysicalResourceId."""
+    c = crhelper.resource_helper.CfnResource()
+    c.init_failure(Exception('TestException'))
+    c.__call__(events["Update"], mock_context)
+
+    assert c.PhysicalResourceId == 'test-pid'
+
+
+@patch('crhelper.log_helper.setupLogger', Mock())
+@patch('crhelper.resource_helper.CfnResource._poll_enabled', Mock(return_value=False))
+@patch('crhelper.resource_helper.CfnResource._polling_init', Mock())
+@patch('crhelper.resource_helper.CfnResource._wait_for_cwlogs', Mock())
+@patch('crhelper.resource_helper.CfnResource._send', Mock())
+@patch('crhelper.resource_helper.CfnResource._set_timeout', Mock())
+@patch('crhelper.resource_helper.CfnResource._wrap_function', Mock())
+def test_init_failure_preserves_event_physical_id_for_delete(events, mock_context):
+    """Delete + init_failure must preserve the event's PhysicalResourceId."""
+    c = crhelper.resource_helper.CfnResource()
+    c.init_failure(Exception('TestException'))
+    c.__call__(events["Delete"], mock_context)
+
+    assert c.PhysicalResourceId == 'test-pid'
+
+
 @patch('crhelper.log_helper.setupLogger', Mock())
 @patch('crhelper.resource_helper.CfnResource._poll_enabled', Mock(return_value=False))
 @patch('crhelper.resource_helper.CfnResource._polling_init', Mock())
