@@ -377,6 +377,42 @@ def test_set_timeout(mock_context):
     c._timer.cancel()
 
 
+# Regression tests for #76: context may not be a real LambdaContext object
+# (e.g. SAM-local invocations, third-party wrappers, ad-hoc test setups
+# pass a dict). Both _set_timeout and _wait_for_cwlogs must degrade
+# gracefully rather than raising AttributeError.
+
+@patch('crhelper.log_helper.setupLogger', Mock())
+@patch('crhelper.resource_helper.CfnResource._poll_enabled', Mock(return_value=False))
+@patch('crhelper.resource_helper.CfnResource._wait_for_cwlogs', Mock())
+@patch('crhelper.resource_helper.CfnResource._send', Mock())
+def test_set_timeout_when_context_lacks_get_remaining_time_in_millis():
+    """_set_timeout must not raise AttributeError when context is a dict."""
+    c = crhelper.resource_helper.CfnResource()
+    c._context = {}
+
+    c._set_timeout()  # must not raise
+
+    # No watchdog timer when we can't compute the remaining time.
+    assert c._timer is None
+
+
+@patch('crhelper.log_helper.setupLogger', Mock())
+@patch('crhelper.resource_helper.CfnResource._poll_enabled', Mock(return_value=False))
+@patch('crhelper.resource_helper.CfnResource._send', Mock())
+@patch('crhelper.resource_helper.CfnResource._set_timeout', Mock())
+def test_wait_for_cwlogs_when_context_lacks_get_remaining_time_in_millis():
+    """_wait_for_cwlogs must not raise AttributeError when context is a dict."""
+    c = crhelper.resource_helper.CfnResource()
+    c._context = {}
+
+    sleep_mock = Mock()
+    c._wait_for_cwlogs(sleep=sleep_mock)  # must not raise
+
+    # No remaining-time info => no sleep.
+    sleep_mock.assert_not_called()
+
+
 # --- response cleanup -----------------------------------------------------
 
 @patch('crhelper.log_helper.setupLogger', Mock())
