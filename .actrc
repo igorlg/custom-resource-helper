@@ -1,0 +1,8 @@
+# act config: map GH-hosted runner labels to local Docker images.
+# act-latest is catthehacker's medium image (~1.7GB), enough for pure-Python
+# workflows that install their own toolchain via setup-uv.
+-P ubuntu-24.04=catthehacker/ubuntu:act-latest
+-P ubuntu-24.04-arm=catthehacker/ubuntu:act-latest
+
+# Verbose by default so failures are easy to read.
+--verbose
