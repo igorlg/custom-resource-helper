@@ -45,7 +45,38 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --locked --extra test
+        run: uv sync --locked --only-group test
 
       - name: Run tests
         run: uv run pytest --cov=crhelper --cov-report=xml --cov-report=term -q
+
+  lint:
+    name: lint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: act compat - expose node on standard PATH
+        if: env.ACT == 'true'
+        run: |
+          set -eu
+          NODE_BIN=$(find /opt/acttoolcache/node -name node -type f -executable 2>/dev/null | head -1)
+          if [ -n "$NODE_BIN" ] && [ ! -e /usr/local/bin/node ]; then
+            ln -sf "$NODE_BIN" /usr/local/bin/node
+          fi
+          node --version
+
+      - name: Install uv with Python 3.13
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: '3.13'
+          enable-cache: true
+
+      - name: Install lint dependencies
+        run: uv sync --locked --only-group lint
+
+      - name: Ruff check
+        run: uv run ruff check
+
+      - name: Mypy
+        run: uv run mypy crhelper/
