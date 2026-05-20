@@ -5,6 +5,14 @@ All notable changes to this fork of `crhelper` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0](https://github.com/igorlg/custom-resource-helper/compare/v2.1.0...v2.2.0) (2026-05-20)
+
+
+### Features
+
+* rename PyPI distribution to cfn-resource-helper ([2b0cd04](https://github.com/igorlg/custom-resource-helper/commit/2b0cd0481464a1e0181a721c93d1201d910be865))
+* rename to cfn-resource-helper + automate PyPI publishing ([96a1e99](https://github.com/igorlg/custom-resource-helper/commit/96a1e991d2857906b128e54c151827014d39fbf8))
+
 ## [2.1.0] - 2026-05-19
 
 First release of this fork. Baselined against upstream
