@@ -5,6 +5,13 @@ All notable changes to this fork of `crhelper` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1](https://github.com/igorlg/custom-resource-helper/compare/v2.2.0...v2.2.1) (2026-05-21)
+
+
+### Documentation
+
+* archive notice — moved to igorlg/cfn-handler ([858a840](https://github.com/igorlg/custom-resource-helper/commit/858a8400baafac57c9f7ba11bf505e79094e0199))
+
 ## [2.2.0](https://github.com/igorlg/custom-resource-helper/compare/v2.1.0...v2.2.0) (2026-05-20)
 
 
