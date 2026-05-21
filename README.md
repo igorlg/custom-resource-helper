@@ -1,280 +1,59 @@
-## Custom Resource Helper
+# Custom Resource Helper (archived)
 
-Simplify best practice Custom Resource creation, sending responses to CloudFormation and providing exception, timeout 
-trapping, and detailed configurable logging.
-
-[![CI](https://github.com/igorlg/custom-resource-helper/actions/workflows/ci.yml/badge.svg)](https://github.com/igorlg/custom-resource-helper/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/cfn-resource-helper.svg)](https://pypi.org/project/cfn-resource-helper/)
-[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue)](https://github.com/igorlg/custom-resource-helper)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
-
-> **Note**: this is a fork of [aws-cloudformation/custom-resource-helper](https://github.com/aws-cloudformation/custom-resource-helper),
-> brought up to date with modern Python tooling, multi-arch CI, and a number of bug fixes from the upstream
-> issue tracker. Distributed on PyPI as **`cfn-resource-helper`** (the upstream name `crhelper` belongs
-> to the original AWS-maintained project). The Python import name is unchanged: `from crhelper import CfnResource`.
-
-## Features
-
-* Dead simple to use, reduces the complexity of writing a CloudFormation custom resource
-* Guarantees that CloudFormation will get a response even if an exception is raised
-* Returns meaningful errors to CloudFormation Stack events in the case of a failure
-* Polling enables run times longer than the lambda 15 minute limit
-* JSON logging that includes request id's, stack id's and request type to assist in tracing logs relevant to a 
-particular CloudFormation event
-* Catches function timeouts and sends CloudFormation a failure response
-* Static typing (mypy) compatible
-* Built-in `test_mode` for unit tests and SAM-local invocations
-
-## Installation
-
-Install into the root folder of your lambda function
-
-```shell
-cd my-lambda-function/
-pip install cfn-resource-helper -t .
-```
-
-The PyPI **distribution name** is `cfn-resource-helper`, the Python **import name** is `crhelper`:
-
-```python
-from crhelper import CfnResource
-```
-
-### Migrating from upstream `crhelper`
-
-If you previously used [`aws-cloudformation/custom-resource-helper`](https://github.com/aws-cloudformation/custom-resource-helper) (PyPI: `crhelper`):
-
-1. Replace `crhelper` with `cfn-resource-helper` in your install command (or `requirements.txt` / `pyproject.toml`).
-2. Imports stay exactly the same: `from crhelper import CfnResource`.
-3. No code changes required. The Python API is identical apart from the new `test_mode` parameter (additive, default off).
-
-## Example Usage
-
-[This blog](https://aws.amazon.com/blogs/infrastructure-and-automation/aws-cloudformation-custom-resource-creation-with-python-aws-lambda-and-crhelper/) covers usage in more detail.
-
-```python
-from crhelper import CfnResource
-import logging
-
-logger = logging.getLogger(__name__)
-# Initialise the helper, all inputs are optional, this example shows the defaults
-helper = CfnResource(json_logging=False, log_level='DEBUG', boto_level='CRITICAL', sleep_on_delete=120, ssl_verify=None)
-
-try:
-    ## Init code goes here
-    pass
-except Exception as e:
-    helper.init_failure(e)
-
-
-@helper.create
-def create(event, context):
-    logger.info("Got Create")
-    # Optionally return an ID that will be used for the resource PhysicalResourceId, 
-    # if None is returned an ID will be generated. If a poll_create function is defined 
-    # return value is placed into the poll event as event['CrHelperData']['PhysicalResourceId']
-    #
-    # To add response data update the helper.Data dict
-    # If poll is enabled data is placed into poll event as event['CrHelperData']
-    helper.Data.update({"test": "testdata"})
-
-    # To return an error to cloudformation you raise an exception:
-    if not helper.Data.get("test"):
-        raise ValueError("this error will show in the cloudformation events log and console.")
-    
-    return "MyResourceId"
-
-
-@helper.update
-def update(event, context):
-    logger.info("Got Update")
-    # If the update resulted in a new resource being created, return an id for the new resource. 
-    # CloudFormation will send a delete event with the old id when stack update completes
-
-
-@helper.delete
-def delete(event, context):
-    logger.info("Got Delete")
-    # Delete never returns anything. Should not fail if the underlying resources are already deleted.
-    # Desired state.
-
-
-@helper.poll_create
-def poll_create(event, context):
-    logger.info("Got create poll")
-    # Return a resource id or True to indicate that creation is complete. if True is returned an id 
-    # will be generated
-    return True
-
-
-def handler(event, context):
-    helper(event, context)
-```
-
-### Polling
-
-If you need longer than the max runtime of 15 minutes, you can enable polling by adding additional decorators for 
-`poll_create`, `poll_update` or `poll_delete`. When a poll function is defined for `create`/`update`/`delete` the 
-function will not send a response to CloudFormation and instead a CloudWatch Events schedule will be created to 
-re-invoke the lambda function every 2 minutes. When the function is invoked the matching `@helper.poll_` function will 
-be called, logic to check for completion should go here, if the function returns `None` then the schedule will run again 
-in 2 minutes. Once complete either return a PhysicalResourceID or `True` to have one generated. The schedule will be 
-deleted and a response sent back to CloudFormation. If you use polling the following additional IAM policy must be 
-attached to the function's IAM role:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "lambda:AddPermission",
-        "lambda:RemovePermission",
-        "events:PutRule",
-        "events:DeleteRule",
-        "events:PutTargets",
-        "events:RemoveTargets"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-```
-### Certificate Verification
-To turn off certification verification, or to use a custom CA bundle path for the underlying boto3 clients used by this library, override the `ssl_verify` argument with the appropriate values.  These can be either:
-* `False` - do not validate SSL certificates. SSL will still be used, but SSL certificates will not be verified.
-* `path/to/cert/bundle.pem` - A filename of the CA cert bundle to uses. You can specify this argument if you want to use a different CA cert bundle than the one used by botocore.
-
-### Testing crhelper Lambdas
-
-For local invocations (SAM-local, unit tests, ad-hoc Python scripts) you usually
-do **not** want crhelper to actually POST to a CloudFormation pre-signed URL.
-Pass `test_mode=True` to skip the response and capture it on the helper instead:
-
-```python
-from crhelper import CfnResource
-
-helper = CfnResource(test_mode=True)
-
-@helper.create
-def create(event, context):
-    helper.Data["MyOutput"] = "computed-value"
-    return "MyResourceId"
-
-def handler(event, context):
-    helper(event, context)
-
-# Drive the handler with a fake event/context, then assert on the response
-# that *would* have been sent to CloudFormation:
-handler(fake_event, fake_context)
-
-assert helper.LastResponse["Status"] == "SUCCESS"
-assert helper.LastResponse["PhysicalResourceId"] == "MyResourceId"
-assert helper.LastResponse["Data"]["MyOutput"] == "computed-value"
-```
-
-`LastResponse` is `None` until `_send` runs; afterwards it contains the dict
-that would have been PUT to `event['ResponseURL']`. With `test_mode=True`,
-the HTTPS call itself is skipped entirely.
-
-### Tips
-
-#### Setting `Reason`
-
-The `Reason` field appears in CloudFormation's Stack Events. By default it's
-empty on success and the exception message on failure. You can set it
-explicitly from your handler to give operators more context:
-
-```python
-@helper.create
-def create(event, context):
-    helper.Reason = "Provisioned 3 widgets, 0 failures"
-    helper.Data["Count"] = 3
-    return "MyResourceId"
-```
-
-#### Hiding sensitive data with `NoEcho`
-
-If your custom resource produces sensitive values (passwords, tokens, keys),
-set `helper.NoEcho = True` so CloudFormation hides the `Data` from console
-output and stack events:
-
-```python
-@helper.create
-def create(event, context):
-    helper.NoEcho = True
-    helper.Data["Token"] = generate_secret_token()
-    return "MyResourceId"
-```
-
-#### `helper.Data` and Updates
-
-`helper.Data` is **per-invocation**. Each time CloudFormation calls your
-Lambda (Create, Update, or Delete), the helper resets `helper.Data` to an
-empty dict before your handler runs. Even if your underlying resource
-hasn't changed during an Update, you still need to populate `helper.Data`
-with the values you want returned to CloudFormation. There is no automatic
-carry-over from the previous invocation.
-
-### Use CDK to deploy a Custom Resource that uses Custom Resource Helper
-
-You can use the [AWS Cloud Development Kit (AWS CDK)](https://docs.aws.amazon.com/cdk/v2/guide/home.html) to deploy a Custom Resource that uses Custom Resource Helper. AWS CDK is an open-source software development framework for defining cloud infrastructure in code and provisioning it through AWS CloudFormation.
-
-> **Important**: `crhelper` is **not** compatible with AWS CDK's [`Provider`](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.custom_resources.Provider.html) construct.
+> **This repository is archived.** The work that started here as a fork of
+> [`aws-cloudformation/custom-resource-helper`][upstream] has moved to a
+> ground-up rewrite under a new name and PyPI distribution:
 >
-> The `Provider` framework deploys an internal "framework" Lambda that wraps your handler and **expects your handler to return a response object** (`{ PhysicalResourceId, Data, NoEcho, ... }`). The framework Lambda then takes care of POSTing to CloudFormation's `ResponseURL` for you.
+> ## → [github.com/igorlg/cfn-handler](https://github.com/igorlg/cfn-handler) ←
 >
-> `crhelper`, in contrast, POSTs directly to `event['ResponseURL']` itself — which is what CloudFormation expects when it invokes a custom-resource Lambda *directly* (i.e. `serviceToken: <lambda_arn>`), but **not** when invoked through the `Provider` framework. Using `crhelper` inside a `Provider`-managed Lambda will cause the response to be sent twice in incompatible formats and the resource will hang.
+> ```sh
+> pip install cfn-handler
+> # or with uv:
+> uv add cfn-handler
+> ```
 >
-> **If you're using `Provider`:** write a plain handler that returns the response dict; don't use `crhelper`. See AWS CDK's [Custom Resources guide](https://docs.aws.amazon.com/cdk/v2/guide/develop-resources.html).
->
-> **If you're using `CustomResource` directly with a `serviceToken`:** `crhelper` is the right fit. See the example below.
+> The new project is `Apache-2.0` licensed (preserving Amazon's original
+> attribution per §4) and ships its first stable release as `cfn-handler 1.0.0`
+> on PyPI: <https://pypi.org/project/cfn-handler/>
 
-#### AWS CDK template example
+[upstream]: https://github.com/aws-cloudformation/custom-resource-helper
 
-```python
-from aws_cdk import (
-    ...
-    aws_lambda as _lambda,
-    CustomResource,
-)
+## Why the move?
 
-crhelperSumResource = _lambda.Function(...)
+The fork (`igorlg/custom-resource-helper`) accumulated 14 PRs that closed
+long-standing upstream issues plus a complete tooling modernization (uv,
+pyproject + hatchling, ruff, mypy strict, GitHub Actions matrix, release-please).
+Continuing to call it `crhelper` while the codebase, public API conventions,
+and release cadence had all diverged from the upstream felt dishonest. A
+rename to `cfn-handler` with a fresh `1.0.0` clarifies both the identity and
+the maintenance commitment.
 
-customResource = CustomResource(
-  self,
-  'MyCustomResource',
-  serviceToken=crhelperSumResource.function_arn,
-  properties={
-    'No1': 1,
-    'No2': 2,
-  },
-)
+## Migration for users
+
+The public API of `cfn-handler` is intentionally similar to `crhelper`'s, so
+a port is mostly a rename:
+
+```diff
+-from crhelper import CfnResource
+-helper = CfnResource()
++from cfn_handler import CustomResource
++resource = CustomResource()
+
+-@helper.create
++@resource.create
+ def on_create(event, context):
+     ...
 ```
 
-## Development
+See the new repo's [README][new-readme] and
+[CHANGELOG][new-changelog] for full details, including the list of
+upstream issues carried forward, the new lifecycle decorator names,
+and the `LambdaContext` Protocol type.
 
-Development tasks are wired up in the project [`Justfile`](./Justfile). With [`uv`](https://docs.astral.sh/uv/) installed:
+[new-readme]: https://github.com/igorlg/cfn-handler/blob/main/README.md
+[new-changelog]: https://github.com/igorlg/cfn-handler/blob/main/CHANGELOG.md
 
-```shell
-uv sync                # install all dev dependencies (test + lint)
-just test              # run the test suite on the host Python
-just test-cov          # with coverage report
-just lint              # ruff + mypy
-just lint-fix          # apply ruff's safe auto-fixes
-just test-matrix       # run the full CI matrix locally via `act` (requires Docker)
-just build             # build wheel + sdist into ./dist
-```
+## What about this repository?
 
-The CI workflow at [`.github/workflows/ci.yml`](.github/workflows/ci.yml) is the single source of truth for the test matrix: 8 jobs across `{ubuntu-24.04, ubuntu-24.04-arm} × {python 3.11, 3.12, 3.13, 3.14}`, plus a separate lint job.
-
-## Credits
-
-Decorator implementation inspired by https://github.com/ryansb/cfn-wrapper-python
-
-Log implementation inspired by https://gitlab.com/hadrien/aws_lambda_logging
-
-## License
-
-This library is licensed under the Apache 2.0 License.
+This repo is read-only. Issues and PRs filed here will not be triaged.
+Please open them at <https://github.com/igorlg/cfn-handler/issues> instead.
